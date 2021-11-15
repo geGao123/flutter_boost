@@ -71,49 +71,18 @@ class BoostNavigator {
       {Map<String, dynamic>? arguments,
         bool withContainer = false,
         bool opaque = true}) async {
-    var pushOption = BoostInterceptorOption(name,
-        arguments: arguments ?? <String, dynamic>{});
-    var future = Future<dynamic>(
-            () => InterceptorState<BoostInterceptorOption>(pushOption));
-    for (var interceptor in appState!.interceptors) {
-      future = future.then<dynamic>((dynamic _state) {
-        final state = _state as InterceptorState<dynamic>;
-        if (state.type == InterceptorResultType.next) {
-          final pushHandler = PushInterceptorHandler();
-          interceptor.onPush(state.data, pushHandler);
-          return pushHandler.future;
-        } else {
-          return state;
-        }
-      });
+    if (isFlutterPage(name)) {
+      // open flutter page.
+      return appState.pushWithResult(name,
+          arguments: arguments, withContainer: withContainer, opaque: opaque);
+    } else {
+      // open native page.
+      final params = CommonParams()
+        ..pageName = name
+        ..arguments = arguments;
+      appState.nativeRouterApi.pushNativeRoute(params);
+      return appState.pendNativeResult(name);
     }
-
-    return future.then((dynamic _state) {
-      final state = _state as InterceptorState<dynamic>;
-      if (state.data is BoostInterceptorOption) {
-        assert(state.type == InterceptorResultType.next);
-        pushOption = state.data;
-        if (isFlutterPage(pushOption.name)) {
-          return appState!.pushWithResult(pushOption.name,
-              uniqueId: pushOption.uniqueId,
-              arguments: pushOption.arguments,
-              withContainer: withContainer,
-              opaque: opaque) as FutureOr<T>;
-        } else {
-          Map<String, dynamic> data = {};
-          data = Map<String, dynamic>.from(pushOption.arguments);
-
-          final params = CommonParams()
-            ..pageName = pushOption.name
-            ..arguments = data;
-          appState!.nativeRouterApi!.pushNativeRoute(params);
-          return appState!.pendNativeResult(pushOption.name);
-        }
-      } else {
-        assert(state.type == InterceptorResultType.resolve);
-        return Future<T>.value(state.data as T);
-      }
-    });
   }
 
   /// This api do two things
